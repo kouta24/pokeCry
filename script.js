@@ -18,7 +18,7 @@ async function fetchPokemonCry(pokemonId) {
 // 重複しないポケモンIDを生成
 function getUniquePokemonIds(count) {
     const ids = [];
-    const availableIds = Array.from({ length: 151 }, (_, i) => i + 1); // カントー地方: 1～151
+    const availableIds = Array.from({ length: 151 }, (_, i) => i + 1);
     for (let i = 0; i < count && availableIds.length > 0; i++) {
         const randomIndex = Math.floor(Math.random() * availableIds.length);
         ids.push(availableIds.splice(randomIndex, 1)[0]);
@@ -28,17 +28,19 @@ function getUniquePokemonIds(count) {
 
 // 指定した数のポケモンデータを取得
 async function getPokemonCries(count) {
-    const pokemonIds = getUniquePokemonIds(count); // 重複しないIDを生成
+    const pokemonIds = getUniquePokemonIds(count);
     const pokemonData = await Promise.all(pokemonIds.map(id => fetchPokemonCry(id)));
     const validData = pokemonData.filter(data => data !== null);
-    return [...validData, ...validData]; // ペアを作成
+    return [...validData, ...validData];
 }
 
 // ゲームボードを構築
 function createGameBoard(pokemonList, rows, cols) {
     const gameBoard = document.getElementById('game-board');
-    gameBoard.innerHTML = ''; // 即クリア
-    gameBoard.style.gridTemplateColumns = `repeat(${cols}, 80px)`;
+    gameBoard.innerHTML = '';
+    // スマホでは列数を調整（例: 最大4列）
+    const effectiveCols = window.innerWidth <= 400 ? Math.min(cols, 4) : cols;
+    gameBoard.style.gridTemplateColumns = `repeat(${effectiveCols}, 1fr)`;
     const shuffled = pokemonList.sort(() => Math.random() - 0.5);
     shuffled.forEach((pokemon, index) => {
         const card = document.createElement('div');
@@ -47,7 +49,7 @@ function createGameBoard(pokemonList, rows, cols) {
         card.dataset.index = index;
         card.dataset.sprite = pokemon.sprite;
         card.addEventListener('click', () => {
-            console.log(`カードクリック: ${pokemon.name}`); // デバッグ用ログ
+            console.log(`カードクリック: ${pokemon.name}`);
             handleCardClick(card, pokemon.cry, pokemon.sprite);
         }, { once: false });
         gameBoard.appendChild(card);
@@ -114,7 +116,7 @@ function handleCardClick(card, cryUrl, spriteUrl) {
             isProcessing = false;
             if (matchedPairs === totalPairs) {
                 stopTimer();
-                setTimeout(() => alert(`ゲームクリア！クリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`), 500);
+                setTimeout(() => alert(`ゲームクリア！\nクリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`), 500);
             }
         } else {
             mistakes += 1;
