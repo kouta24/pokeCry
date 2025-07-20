@@ -4,9 +4,11 @@ async function fetchPokemonCry(pokemonId) {
         const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
         if (!response.ok) throw new Error(`ポケモンID ${pokemonId} のデータ取得に失敗しました`);
         const data = await response.json();
+        const cryUrl = data.cries.legacy || data.cries.latest;
+        console.log(`ポケモン: ${data.name}, 鳴き声: ${cryUrl}`);
         return {
             name: data.name,
-            cry: data.cries.latest,
+            cry: cryUrl,
             sprite: data.sprites.versions['generation-v']['black-white'].front_default
         };
     } catch (error) {
@@ -38,9 +40,7 @@ async function getPokemonCries(count) {
 function createGameBoard(pokemonList, rows, cols) {
     const gameBoard = document.getElementById('game-board');
     gameBoard.innerHTML = '';
-    // スマホでは列数を調整（例: 最大4列）
-    const effectiveCols = window.innerWidth <= 400 ? Math.min(cols, 4) : cols;
-    gameBoard.style.gridTemplateColumns = `repeat(${effectiveCols}, 1fr)`;
+    gameBoard.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
     const shuffled = pokemonList.sort(() => Math.random() - 0.5);
     shuffled.forEach((pokemon, index) => {
         const card = document.createElement('div');
@@ -161,10 +161,13 @@ function setupControls() {
     document.getElementById('medium').addEventListener('click', () => startGame(4, 5, 10));
     document.getElementById('hard').addEventListener('click', () => startGame(5, 6, 15));
     document.getElementById('restart').addEventListener('click', () => {
-        stopTimer();
-        document.getElementById('game-container').style.display = 'none';
-        document.getElementById('game-board').innerHTML = '';
-        document.getElementById('difficulty-selection').style.display = 'block';
+        console.log('リスタートボタンクリック');
+        if (confirm('リスタートしますか？')) {
+            stopTimer();
+            document.getElementById('game-container').style.display = 'none';
+            document.getElementById('game-board').innerHTML = '';
+            document.getElementById('difficulty-selection').style.display = 'block';
+        }
     });
 }
 
