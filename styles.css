@@ -63,6 +63,13 @@ button {
 button:hover {
     background-color: #3498db;
 }
+#ex {
+    background-color: #e74c3c; /* 目に優しい赤 */
+    display: none; /* 初期非表示 */
+}
+#ex:hover {
+    background-color: #c0392b; /* ホバー時の赤 */
+}
 
 /* スマホ対応 (768px以下) */
 @media (max-width: 768px) {
