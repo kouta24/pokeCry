@@ -4,7 +4,7 @@ async function fetchPokemonCry(pokemonId) {
         const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
         if (!response.ok) throw new Error(`ポケモンID ${pokemonId} のデータ取得に失敗しました`);
         const data = await response.json();
-        const cryUrl = data.cries.legacy || data.cries.latest;
+        const cryUrl = data.cries.legacy || data.cries.latest || 'https://example.com/default-cry.mp3'; // デフォルト音声
         console.log(`ポケモン: ${data.name}, 鳴き声: ${cryUrl}`);
         return {
             name: data.name,
@@ -28,12 +28,16 @@ function getUniquePokemonIds(count) {
     return ids;
 }
 
-// 指定した数のポケモンデータを取得
+// 指定した数のポケモンデータを取得（レート制限対策で遅延を追加）
 async function getPokemonCries(count) {
     const pokemonIds = getUniquePokemonIds(count);
-    const pokemonData = await Promise.all(pokemonIds.map(id => fetchPokemonCry(id)));
-    const validData = pokemonData.filter(data => data !== null);
-    return [...validData, ...validData];
+    const pokemonData = [];
+    for (const id of pokemonIds) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms遅延
+        const data = await fetchPokemonCry(id);
+        if (data) pokemonData.push(data);
+    }
+    return [...pokemonData, ...pokemonData];
 }
 
 // ゲームボードを構築
@@ -65,20 +69,25 @@ let volume = 0.05;
 let timerInterval = null;
 let elapsedTime = 0;
 let totalPairs = 0;
-let selectedDifficulty = ''; // 難易度を保存
+let selectedDifficulty = '';
+let startTime = 0;
 
-// タイマー管理
+// タイマー管理（高精度）
 function startTimer() {
-    if (timerInterval) clearInterval(timerInterval);
-    elapsedTime = 0;
-    timerInterval = setInterval(() => {
-        elapsedTime += 1;
+    if (timerInterval) cancelAnimationFrame(timerInterval);
+    startTime = performance.now();
+    function updateTimer() {
+        elapsedTime = Math.floor((performance.now() - startTime) / 1000);
         document.getElementById('timer').textContent = elapsedTime;
-    }, 1000);
+        console.log(`タイマー更新: ${elapsedTime}秒`);
+        timerInterval = requestAnimationFrame(updateTimer);
+    }
+    timerInterval = requestAnimationFrame(updateTimer);
 }
 
 function stopTimer() {
-    if (timerInterval) clearInterval(timerInterval);
+    if (timerInterval) cancelAnimationFrame(timerInterval);
+    timerInterval = null;
 }
 
 // 音量スライダーの初期化
@@ -99,9 +108,17 @@ function handleCardClick(card, cryUrl, spriteUrl) {
     }
 
     card.classList.add('flipped');
-    const audio = new Audio(cryUrl);
-    audio.volume = volume;
-    audio.play().catch(error => console.error('音声再生エラー:', error));
+    if (cryUrl) {
+        const audio = new Audio(cryUrl);
+        audio.volume = volume;
+        audio.play().catch(error => {
+            console.error(`音声再生エラー (${card.dataset.pokemon}):`, error);
+            alert(`鳴き声の再生に失敗しました: ${card.dataset.pokemon}`);
+        });
+    } else {
+        console.warn(`鳴き声URLがありません: ${card.dataset.pokemon}`);
+        alert(`鳴き声がありません: ${card.dataset.pokemon}`);
+    }
     flippedCards.push({ card, cryUrl, spriteUrl });
 
     if (flippedCards.length === 2) {
@@ -134,7 +151,7 @@ function handleCardClick(card, cryUrl, spriteUrl) {
 
 // ゲーム開始
 async function startGame(rows, cols, pairs, difficulty) {
-    selectedDifficulty = difficulty; // 難易度を保存
+    selectedDifficulty = difficulty;
     totalPairs = pairs;
     flippedCards = [];
     matchedPairs = 0;
