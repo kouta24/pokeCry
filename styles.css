@@ -1,0 +1,57 @@
+body {
+    text-align: center;
+    font-family: Arial, sans-serif;
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+}
+h1, h2 {
+    color: #e0e0e0;
+}
+#difficulty-selection {
+    margin: 20px;
+}
+#game-board {
+    display: grid;
+    gap: 10px;
+    margin: 20px auto;
+    width: fit-content;
+}
+.card {
+    width: 80px;
+    height: 80px;
+    background: #2c3e50;
+    border: 1px solid #34495e;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+.card.flipped {
+    background: #c3c5c7; /* めくったときの色 */
+    transform: rotateY(180deg);
+}
+.card.matched {
+    background: #c3c5c7; /* 正解時の色（ドット絵が上書きされる） */
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    transform: rotateY(180deg);
+}
+#volume {
+    width: 200px;
+    margin: 10px;
+}
+#volume-value {
+    font-weight: bold;
+    color: #e0e0e0;
+}
+button {
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    background-color: #2980b9;
+    color: #e0e0e0;
+    border: none;
+    border-radius: 5px;
+}
+button:hover {
+    background-color: #3498db;
+}

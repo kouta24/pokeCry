@@ -1,0 +1,171 @@
+// ポケモンの鳴き声とドット絵データを取得（カントー地方限定）
+async function fetchPokemonCry(pokemonId) {
+    try {
+        const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
+        if (!response.ok) throw new Error(`ポケモンID ${pokemonId} のデータ取得に失敗しました`);
+        const data = await response.json();
+        return {
+            name: data.name,
+            cry: data.cries.latest,
+            sprite: data.sprites.versions['generation-v']['black-white'].front_default
+        };
+    } catch (error) {
+        console.error('エラー:', error);
+        return null;
+    }
+}
+
+// 重複しないポケモンIDを生成
+function getUniquePokemonIds(count) {
+    const ids = [];
+    const availableIds = Array.from({ length: 151 }, (_, i) => i + 1); // カントー地方: 1～151
+    for (let i = 0; i < count && availableIds.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * availableIds.length);
+        ids.push(availableIds.splice(randomIndex, 1)[0]);
+    }
+    return ids;
+}
+
+// 指定した数のポケモンデータを取得
+async function getPokemonCries(count) {
+    const pokemonIds = getUniquePokemonIds(count); // 重複しないIDを生成
+    const pokemonData = await Promise.all(pokemonIds.map(id => fetchPokemonCry(id)));
+    const validData = pokemonData.filter(data => data !== null);
+    return [...validData, ...validData]; // ペアを作成
+}
+
+// ゲームボードを構築
+function createGameBoard(pokemonList, rows, cols) {
+    const gameBoard = document.getElementById('game-board');
+    gameBoard.innerHTML = ''; // 即クリア
+    gameBoard.style.gridTemplateColumns = `repeat(${cols}, 80px)`;
+    const shuffled = pokemonList.sort(() => Math.random() - 0.5);
+    shuffled.forEach((pokemon, index) => {
+        const card = document.createElement('div');
+        card.classList.add('card');
+        card.dataset.pokemon = pokemon.name;
+        card.dataset.index = index;
+        card.dataset.sprite = pokemon.sprite;
+        card.addEventListener('click', () => {
+            console.log(`カードクリック: ${pokemon.name}`); // デバッグ用ログ
+            handleCardClick(card, pokemon.cry, pokemon.sprite);
+        }, { once: false });
+        gameBoard.appendChild(card);
+    });
+}
+
+// ゲーム状態の管理
+let flippedCards = [];
+let matchedPairs = 0;
+let mistakes = 0;
+let isProcessing = false;
+let volume = 0.05;
+let timerInterval = null;
+let elapsedTime = 0;
+let totalPairs = 0;
+
+// タイマー管理
+function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    elapsedTime = 0;
+    timerInterval = setInterval(() => {
+        elapsedTime += 1;
+        document.getElementById('timer').textContent = elapsedTime;
+    }, 1000);
+}
+
+function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+}
+
+// 音量スライダーの初期化
+function setupVolumeControl() {
+    const volumeSlider = document.getElementById('volume');
+    const volumeValue = document.getElementById('volume-value');
+    volumeSlider.addEventListener('input', () => {
+        volume = volumeSlider.value / 100;
+        volumeValue.textContent = `${volumeSlider.value}%`;
+    });
+}
+
+// カードクリック時の処理
+function handleCardClick(card, cryUrl, spriteUrl) {
+    if (isProcessing || flippedCards.length >= 2 || card.classList.contains('flipped') || card.classList.contains('matched')) {
+        console.log('クリック無効:', { isProcessing, flippedCardsLength: flippedCards.length, isFlipped: card.classList.contains('flipped'), isMatched: card.classList.contains('matched') });
+        return;
+    }
+
+    card.classList.add('flipped');
+    const audio = new Audio(cryUrl);
+    audio.volume = volume;
+    audio.play().catch(error => console.error('音声再生エラー:', error));
+    flippedCards.push({ card, cryUrl, spriteUrl });
+
+    if (flippedCards.length === 2) {
+        isProcessing = true;
+        const [card1, card2] = flippedCards;
+        if (card1.cryUrl === card2.cryUrl) {
+            card1.card.classList.add('matched');
+            card2.card.classList.add('matched');
+            card1.card.style.backgroundImage = `url(${card1.spriteUrl})`;
+            card2.card.style.backgroundImage = `url(${card2.spriteUrl})`;
+            matchedPairs += 1;
+            flippedCards = [];
+            isProcessing = false;
+            if (matchedPairs === totalPairs) {
+                stopTimer();
+                setTimeout(() => alert(`ゲームクリア！クリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`), 500);
+            }
+        } else {
+            mistakes += 1;
+            document.getElementById('mistakes').textContent = mistakes;
+            setTimeout(() => {
+                card1.card.classList.remove('flipped');
+                card2.card.classList.remove('flipped');
+                flippedCards = [];
+                isProcessing = false;
+            }, 1000);
+        }
+    }
+}
+
+// ゲーム開始
+async function startGame(rows, cols, pairs) {
+    totalPairs = pairs;
+    flippedCards = [];
+    matchedPairs = 0;
+    mistakes = 0;
+    isProcessing = false;
+    elapsedTime = 0;
+    document.getElementById('mistakes').textContent = mistakes;
+    document.getElementById('timer').textContent = elapsedTime;
+    document.getElementById('game-container').style.display = 'none';
+    document.getElementById('game-board').innerHTML = '';
+    document.getElementById('difficulty-selection').style.display = 'block';
+    const pokemonList = await getPokemonCries(pairs);
+    if (pokemonList.length === 0) {
+        alert('ポケモンデータの取得に失敗しました。もう一度お試しください。');
+        return;
+    }
+    document.getElementById('difficulty-selection').style.display = 'none';
+    document.getElementById('game-container').style.display = 'block';
+    createGameBoard(pokemonList, rows, cols);
+    startTimer();
+}
+
+// 難易度選択とリスタート
+function setupControls() {
+    document.getElementById('easy').addEventListener('click', () => startGame(3, 4, 6));
+    document.getElementById('medium').addEventListener('click', () => startGame(4, 5, 10));
+    document.getElementById('hard').addEventListener('click', () => startGame(5, 6, 15));
+    document.getElementById('restart').addEventListener('click', () => {
+        stopTimer();
+        document.getElementById('game-container').style.display = 'none';
+        document.getElementById('game-board').innerHTML = '';
+        document.getElementById('difficulty-selection').style.display = 'block';
+    });
+}
+
+// 初期化
+setupVolumeControl();
+setupControls();

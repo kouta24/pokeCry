@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ポケモン鳴き声神経衰弱</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>ポケモン鳴き声神経衰弱</h1>
+    <div id="difficulty-selection">
+        <h2>難易度を選択</h2>
+        <button id="easy">初級 (4×3)</button>
+        <button id="medium">中級 (5×4)</button>
+        <button id="hard">上級 (6×5)</button>
+    </div>
+    <div id="game-container" style="display: none;">
+        <div id="game-board"></div>
+        <p style="display: none;">クリア時間: <span id="timer">0</span>秒</p>
+        <p style="display: none;">間違えた回数: <span id="mistakes">0</span>回</p>
+        <div>
+            <label for="volume">音量: <span id="volume-value">5%</span></label>
+            <input type="range" id="volume" min="0" max="100" value="5">
+        </div>
+        <button id="restart">リスタート</button>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
