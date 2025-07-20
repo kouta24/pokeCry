@@ -5,7 +5,6 @@ async function fetchPokemonCry(pokemonId, useLegacy = false) {
         if (!response.ok) throw new Error(`ポケモンID ${pokemonId} のデータ取得に失敗しました`);
         const data = await response.json();
         const cryUrl = useLegacy ? (data.cries.legacy || data.cries.latest) : data.cries.latest;
-        console.log(`ポケモン: ${data.name}, 鳴き声: ${cryUrl}, Legacy: ${useLegacy}`);
         return {
             pokemonId, // ペア判定用
             name: data.name,
@@ -13,7 +12,6 @@ async function fetchPokemonCry(pokemonId, useLegacy = false) {
             sprite: data.sprites.versions['generation-v']['black-white'].front_default
         };
     } catch (error) {
-        console.error('エラー:', error);
         return null;
     }
 }
@@ -61,9 +59,8 @@ function createGameBoard(pokemonList, rows, cols) {
         card.dataset.pokemon = pokemon.name;
         card.dataset.index = index;
         card.dataset.sprite = pokemon.sprite;
-        card.dataset.cry = pokemon.cry; // cryUrlを保存
+        card.dataset.cry = pokemon.cry;
         card.addEventListener('click', () => {
-            console.log(`カードクリック: ${pokemon.name}, ID: ${pokemon.pokemonId}, 鳴き声: ${pokemon.cry}`);
             handleCardClick(card, pokemon.cry, pokemon.sprite, pokemon.pokemonId, selectedDifficulty, index);
         }, { once: false });
         gameBoard.appendChild(card);
@@ -81,8 +78,8 @@ let elapsedTime = 0;
 let totalPairs = 0;
 let selectedDifficulty = '';
 let startTime = 0;
-let isExUnlocked = localStorage.getItem('isExUnlocked') === 'true'; // 解放状態を読み込み
-let lastCardFlipped = false; // 最後のカードめくりフラグ
+let isExUnlocked = localStorage.getItem('isExUnlocked') === 'true';
+let onlyLastCardFlipped = false;
 
 // EXボタンの表示を更新
 function updateExButton() {
@@ -96,7 +93,6 @@ function startTimer() {
     function updateTimer() {
         elapsedTime = Math.floor((performance.now() - startTime) / 1000);
         document.getElementById('timer').textContent = elapsedTime;
-        console.log(`タイマー更新: ${elapsedTime}秒`);
         timerInterval = requestAnimationFrame(updateTimer);
     }
     timerInterval = requestAnimationFrame(updateTimer);
@@ -120,29 +116,32 @@ function setupVolumeControl() {
 // カードクリック時の処理
 function handleCardClick(card, cryUrl, spriteUrl, pokemonId, difficulty, index) {
     if (isProcessing || flippedCards.length >= 2 || card.classList.contains('flipped') || card.classList.contains('matched')) {
-        console.log('クリック無効:', { isProcessing, flippedCardsLength: flippedCards.length, isFlipped: card.classList.contains('flipped'), isMatched: card.classList.contains('matched') });
         return;
     }
 
     card.classList.add('flipped');
+
+    // 上級で右下カード（index=29）のみめくられたかチェック
+    if (difficulty === '上級') {
+        const allCards = document.querySelectorAll('.card');
+        const otherCardsFlipped = Array.from(allCards).some(c => c !== card && (c.classList.contains('flipped') || c.classList.contains('matched')));
+        if (index === 29 && !otherCardsFlipped) {
+            onlyLastCardFlipped = true;
+        } else {
+            onlyLastCardFlipped = false;
+        }
+    }
+
     if (cryUrl) {
         const audio = new Audio(cryUrl);
         audio.volume = volume;
-        audio.play().catch(error => {
-            console.error(`音声再生エラー (${card.dataset.pokemon}):`, error);
+        audio.play().catch(() => {
             alert(`鳴き声の再生に失敗しました: ${card.dataset.pokemon}`);
         });
     } else {
-        console.warn(`鳴き声URLがありません: ${card.dataset.pokemon}`);
         alert(`鳴き声がありません: ${card.dataset.pokemon}`);
     }
     flippedCards.push({ card, cryUrl, spriteUrl, pokemonId });
-
-    // 上級で最後のカード（index=29）をめくったかチェック
-    if (difficulty === '上級' && index === 29) {
-        lastCardFlipped = true;
-        console.log('最後のカードをめくりました');
-    }
 
     if (flippedCards.length === 2) {
         isProcessing = true;
@@ -159,8 +158,8 @@ function handleCardClick(card, cryUrl, spriteUrl, pokemonId, difficulty, index) 
             if (matchedPairs === totalPairs) {
                 stopTimer();
                 let alertMessage = `${selectedDifficulty}クリア！\nクリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`;
-                if (difficulty === '上級' && !isExUnlocked) {
-                    alertMessage += '\n上級で一番右下のカードを1枚だけめくってリスタートすると...？';
+                if (difficulty === '上級' && !isExUnlocked && mistakes <= 20) {
+                    alertMessage += '\n上級で一番右下のカード1枚だけめくってリスタートすると...？';
                 }
                 setTimeout(() => alert(alertMessage), 500);
             }
@@ -186,7 +185,7 @@ async function startGame(rows, cols, pairs, difficulty) {
     mistakes = 0;
     isProcessing = false;
     elapsedTime = 0;
-    lastCardFlipped = false; // リセット
+    onlyLastCardFlipped = false;
     document.getElementById('mistakes').textContent = mistakes;
     document.getElementById('timer').textContent = elapsedTime;
     document.getElementById('game-container').style.display = 'none';
@@ -212,12 +211,10 @@ function setupControls() {
         if (isExUnlocked) startGame(6, 6, 18, 'EX');
     });
     document.getElementById('restart').addEventListener('click', () => {
-        console.log('リスタートボタンクリック');
         if (confirm('リスタートしますか？')) {
-            if (selectedDifficulty === '上級' && lastCardFlipped) {
+            if (selectedDifficulty === '上級' && onlyLastCardFlipped) {
                 isExUnlocked = true;
                 localStorage.setItem('isExUnlocked', 'true');
-                console.log('EXモード解放');
             }
             stopTimer();
             document.getElementById('game-container').style.display = 'none';
@@ -226,7 +223,7 @@ function setupControls() {
             updateExButton();
         }
     });
-    updateExButton(); // 初期表示を更新
+    updateExButton();
 }
 
 // 初期化
