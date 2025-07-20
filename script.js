@@ -65,6 +65,7 @@ let volume = 0.05;
 let timerInterval = null;
 let elapsedTime = 0;
 let totalPairs = 0;
+let selectedDifficulty = ''; // 難易度を保存
 
 // タイマー管理
 function startTimer() {
@@ -116,7 +117,7 @@ function handleCardClick(card, cryUrl, spriteUrl) {
             isProcessing = false;
             if (matchedPairs === totalPairs) {
                 stopTimer();
-                setTimeout(() => alert(`ゲームクリア！\nクリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`), 500);
+                setTimeout(() => alert(`${selectedDifficulty}クリア！\nクリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`), 500);
             }
         } else {
             mistakes += 1;
@@ -132,7 +133,8 @@ function handleCardClick(card, cryUrl, spriteUrl) {
 }
 
 // ゲーム開始
-async function startGame(rows, cols, pairs) {
+async function startGame(rows, cols, pairs, difficulty) {
+    selectedDifficulty = difficulty; // 難易度を保存
     totalPairs = pairs;
     flippedCards = [];
     matchedPairs = 0;
@@ -157,9 +159,9 @@ async function startGame(rows, cols, pairs) {
 
 // 難易度選択とリスタート
 function setupControls() {
-    document.getElementById('easy').addEventListener('click', () => startGame(3, 4, 6));
-    document.getElementById('medium').addEventListener('click', () => startGame(4, 5, 10));
-    document.getElementById('hard').addEventListener('click', () => startGame(5, 6, 15));
+    document.getElementById('easy').addEventListener('click', () => startGame(3, 4, 6, '初級'));
+    document.getElementById('medium').addEventListener('click', () => startGame(4, 5, 10, '中級'));
+    document.getElementById('hard').addEventListener('click', () => startGame(5, 6, 15, '上級'));
     document.getElementById('restart').addEventListener('click', () => {
         console.log('リスタートボタンクリック');
         if (confirm('リスタートしますか？')) {
