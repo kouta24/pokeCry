@@ -64,11 +64,11 @@ button:hover {
     background-color: #3498db;
 }
 #ex {
-    background-color: #e74c3c; /* 目に優しい赤 */
-    display: none; /* 初期非表示 */
+    background-color: #e74c3c;
+    display: none;
 }
 #ex:hover {
-    background-color: #c0392b; /* ホバー時の赤 */
+    background-color: #c0392b;
 }
 
 /* スマホ対応 (768px以下) */
