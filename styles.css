@@ -64,7 +64,7 @@ button:hover {
     background-color: #3498db;
 }
 
-/* スマホ対応 (画面幅768px以下) */
+/* スマホ対応 (768px以下) */
 @media (max-width: 768px) {
     h1 {
         font-size: 20px;
@@ -72,9 +72,18 @@ button:hover {
     h2 {
         font-size: 16px;
     }
+    #difficulty-selection {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    #difficulty-selection button {
+        width: 150px;
+        margin: 5px 0;
+    }
     .card {
-        width: 60px;
-        height: 60px;
+        width: 50px;
+        height: 50px;
     }
     #game-board {
         gap: 6px;
@@ -88,7 +97,7 @@ button:hover {
     }
 }
 
-/* 極小画面 (画面幅400px以下) */
+/* 極小画面 (400px以下) */
 @media (max-width: 400px) {
     h1 {
         font-size: 18px;
@@ -97,8 +106,8 @@ button:hover {
         font-size: 14px;
     }
     .card {
-        width: 50px;
-        height: 50px;
+        width: 40px;
+        height: 40px;
     }
     #game-board {
         gap: 5px;
