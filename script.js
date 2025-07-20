@@ -1,14 +1,15 @@
 // ポケモンの鳴き声とドット絵データを取得（カントー地方限定）
-async function fetchPokemonCry(pokemonId) {
+async function fetchPokemonCry(pokemonId, useLegacy = false) {
     try {
         const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonId}`);
         if (!response.ok) throw new Error(`ポケモンID ${pokemonId} のデータ取得に失敗しました`);
         const data = await response.json();
-        const cryUrl = data.cries.legacy || data.cries.latest || 'https://example.com/default-cry.mp3'; // デフォルト音声
-        console.log(`ポケモン: ${data.name}, 鳴き声: ${cryUrl}`);
+        const cryUrl = useLegacy ? (data.cries.legacy || data.cries.latest) : data.cries.latest;
+        console.log(`ポケモン: ${data.name}, 鳴き声: ${cryUrl}, Legacy: ${useLegacy}`);
         return {
+            pokemonId, // ペア判定用
             name: data.name,
-            cry: cryUrl,
+            cry: cryUrl || 'https://example.com/default-cry.mp3', // デフォルト音声
             sprite: data.sprites.versions['generation-v']['black-white'].front_default
         };
     } catch (error) {
@@ -28,16 +29,23 @@ function getUniquePokemonIds(count) {
     return ids;
 }
 
-// 指定した数のポケモンデータを取得（レート制限対策で遅延を追加）
-async function getPokemonCries(count) {
+// 指定した数のポケモンデータを取得
+async function getPokemonCries(count, difficulty) {
     const pokemonIds = getUniquePokemonIds(count);
     const pokemonData = [];
     for (const id of pokemonIds) {
-        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms遅延
-        const data = await fetchPokemonCry(id);
-        if (data) pokemonData.push(data);
+        await new Promise(resolve => setTimeout(resolve, 100)); // レート制限対策
+        if (difficulty === 'EX') {
+            const latestData = await fetchPokemonCry(id, false); // latest
+            const legacyData = await fetchPokemonCry(id, true); // legacy
+            if (latestData) pokemonData.push(latestData);
+            if (legacyData) pokemonData.push(legacyData);
+        } else {
+            const data = await fetchPokemonCry(id, true); // legacy優先
+            if (data) pokemonData.push(data, data); // 同一cryUrlでペア
+        }
     }
-    return [...pokemonData, ...pokemonData];
+    return pokemonData;
 }
 
 // ゲームボードを構築
@@ -49,12 +57,14 @@ function createGameBoard(pokemonList, rows, cols) {
     shuffled.forEach((pokemon, index) => {
         const card = document.createElement('div');
         card.classList.add('card');
+        card.dataset.pokemonId = pokemon.pokemonId;
         card.dataset.pokemon = pokemon.name;
         card.dataset.index = index;
         card.dataset.sprite = pokemon.sprite;
+        card.dataset.cry = pokemon.cry; // cryUrlを保存
         card.addEventListener('click', () => {
-            console.log(`カードクリック: ${pokemon.name}`);
-            handleCardClick(card, pokemon.cry, pokemon.sprite);
+            console.log(`カードクリック: ${pokemon.name}, ID: ${pokemon.pokemonId}, 鳴き声: ${pokemon.cry}`);
+            handleCardClick(card, pokemon.cry, pokemon.sprite, pokemon.pokemonId, selectedDifficulty, index);
         }, { once: false });
         gameBoard.appendChild(card);
     });
@@ -71,6 +81,13 @@ let elapsedTime = 0;
 let totalPairs = 0;
 let selectedDifficulty = '';
 let startTime = 0;
+let isExUnlocked = localStorage.getItem('isExUnlocked') === 'true'; // 解放状態を読み込み
+let lastCardFlipped = false; // 最後のカードめくりフラグ
+
+// EXボタンの表示を更新
+function updateExButton() {
+    document.getElementById('ex').style.display = isExUnlocked ? 'inline-block' : 'none';
+}
 
 // タイマー管理（高精度）
 function startTimer() {
@@ -101,7 +118,7 @@ function setupVolumeControl() {
 }
 
 // カードクリック時の処理
-function handleCardClick(card, cryUrl, spriteUrl) {
+function handleCardClick(card, cryUrl, spriteUrl, pokemonId, difficulty, index) {
     if (isProcessing || flippedCards.length >= 2 || card.classList.contains('flipped') || card.classList.contains('matched')) {
         console.log('クリック無効:', { isProcessing, flippedCardsLength: flippedCards.length, isFlipped: card.classList.contains('flipped'), isMatched: card.classList.contains('matched') });
         return;
@@ -119,12 +136,19 @@ function handleCardClick(card, cryUrl, spriteUrl) {
         console.warn(`鳴き声URLがありません: ${card.dataset.pokemon}`);
         alert(`鳴き声がありません: ${card.dataset.pokemon}`);
     }
-    flippedCards.push({ card, cryUrl, spriteUrl });
+    flippedCards.push({ card, cryUrl, spriteUrl, pokemonId });
+
+    // 上級で最後のカード（index=29）をめくったかチェック
+    if (difficulty === '上級' && index === 29) {
+        lastCardFlipped = true;
+        console.log('最後のカードをめくりました');
+    }
 
     if (flippedCards.length === 2) {
         isProcessing = true;
         const [card1, card2] = flippedCards;
-        if (card1.cryUrl === card2.cryUrl) {
+        const isMatch = difficulty === 'EX' ? (card1.pokemonId === card2.pokemonId) : (card1.cryUrl === card2.cryUrl);
+        if (isMatch) {
             card1.card.classList.add('matched');
             card2.card.classList.add('matched');
             card1.card.style.backgroundImage = `url(${card1.spriteUrl})`;
@@ -134,7 +158,11 @@ function handleCardClick(card, cryUrl, spriteUrl) {
             isProcessing = false;
             if (matchedPairs === totalPairs) {
                 stopTimer();
-                setTimeout(() => alert(`${selectedDifficulty}クリア！\nクリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`), 500);
+                let alertMessage = `${selectedDifficulty}クリア！\nクリア時間: ${elapsedTime}秒, 間違えた回数: ${mistakes}回`;
+                if (difficulty === '上級' && !isExUnlocked) {
+                    alertMessage += '\n上級で一番右下のカードを1枚だけめくってリスタートすると...？';
+                }
+                setTimeout(() => alert(alertMessage), 500);
             }
         } else {
             mistakes += 1;
@@ -158,13 +186,14 @@ async function startGame(rows, cols, pairs, difficulty) {
     mistakes = 0;
     isProcessing = false;
     elapsedTime = 0;
+    lastCardFlipped = false; // リセット
     document.getElementById('mistakes').textContent = mistakes;
     document.getElementById('timer').textContent = elapsedTime;
     document.getElementById('game-container').style.display = 'none';
     document.getElementById('game-board').innerHTML = '';
     document.getElementById('difficulty-selection').style.display = 'block';
-    const pokemonList = await getPokemonCries(pairs);
-    if (pokemonList.length === 0) {
+    const pokemonList = await getPokemonCries(pairs, difficulty);
+    if (pokemonList.length < pairs * 2) {
         alert('ポケモンデータの取得に失敗しました。もう一度お試しください。');
         return;
     }
@@ -179,15 +208,25 @@ function setupControls() {
     document.getElementById('easy').addEventListener('click', () => startGame(3, 4, 6, '初級'));
     document.getElementById('medium').addEventListener('click', () => startGame(4, 5, 10, '中級'));
     document.getElementById('hard').addEventListener('click', () => startGame(5, 6, 15, '上級'));
+    document.getElementById('ex').addEventListener('click', () => {
+        if (isExUnlocked) startGame(6, 6, 18, 'EX');
+    });
     document.getElementById('restart').addEventListener('click', () => {
         console.log('リスタートボタンクリック');
         if (confirm('リスタートしますか？')) {
+            if (selectedDifficulty === '上級' && lastCardFlipped) {
+                isExUnlocked = true;
+                localStorage.setItem('isExUnlocked', 'true');
+                console.log('EXモード解放');
+            }
             stopTimer();
             document.getElementById('game-container').style.display = 'none';
             document.getElementById('game-board').innerHTML = '';
             document.getElementById('difficulty-selection').style.display = 'block';
+            updateExButton();
         }
     });
+    updateExButton(); // 初期表示を更新
 }
 
 // 初期化
